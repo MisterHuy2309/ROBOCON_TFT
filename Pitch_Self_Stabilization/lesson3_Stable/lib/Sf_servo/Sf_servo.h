@@ -4,80 +4,79 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-
-
+// Chân bật/tắt servo
 #define SERVO_ENABLE_PIN 42
+// Địa chỉ I2C của PCA9685
 #define PCA9685_ADDR 0x40
 
-#define PCA9685_MODE1 0x00      /**< Mode Register 1 */
-#define PCA9685_MODE2 0x01      /**< Mode Register 2 */
-#define PCA9685_SUBADR1 0x02    /**< I2C-bus subaddress 1 */
-#define PCA9685_SUBADR2 0x03    /**< I2C-bus subaddress 2 */
-#define PCA9685_SUBADR3 0x04    /**< I2C-bus subaddress 3 */
-#define PCA9685_ALLCALLADR 0x05 /**< LED All Call I2C-bus address */
-#define PCA9685_LED0_ON_L 0x06  /**< LED0 on tick, low byte*/
-#define PCA9685_LED0_ON_H 0x07  /**< LED0 on tick, high byte*/
-#define PCA9685_LED0_OFF_L 0x08 /**< LED0 off tick, low byte */
-#define PCA9685_LED0_OFF_H 0x09 /**< LED0 off tick, high byte */
-// etc all 16:  LED15_OFF_H 0x45
-#define PCA9685_ALLLED_ON_L 0xFA  /**< load all the LEDn_ON registers, low */
-#define PCA9685_ALLLED_ON_H 0xFB  /**< load all the LEDn_ON registers, high */
-#define PCA9685_ALLLED_OFF_L 0xFC /**< load all the LEDn_OFF registers, low */
-#define PCA9685_ALLLED_OFF_H 0xFD /**< load all the LEDn_OFF registers,high */
-#define PCA9685_PRESCALE 0xFE     /**< Prescaler for PWM output frequency */
-#define PCA9685_TESTMODE 0xFF     /**< defines the test mode to be entered */
+// Các thanh ghi PCA9685
+#define PCA9685_MODE1 0x00      /**< Thanh ghi chế độ 1 */
+#define PCA9685_MODE2 0x01      /**< Thanh ghi chế độ 2 */
+#define PCA9685_SUBADR1 0x02    /**< Địa chỉ phụ I2C 1 */
+#define PCA9685_SUBADR2 0x03    /**< Địa chỉ phụ I2C 2 */
+#define PCA9685_SUBADR3 0x04    /**< Địa chỉ phụ I2C 3 */
+#define PCA9685_ALLCALLADR 0x05 /**< Địa chỉ gọi tất cả LED I2C */
+#define PCA9685_LED0_ON_L 0x06  /**< LED0 bật, byte thấp */
+#define PCA9685_LED0_ON_H 0x07  /**< LED0 bật, byte cao */
+#define PCA9685_LED0_OFF_L 0x08 /**< LED0 tắt, byte thấp */
+#define PCA9685_LED0_OFF_H 0x09 /**< LED0 tắt, byte cao */
+// v.v cho tất cả 16 LED: LED15_OFF_H 0x45
+#define PCA9685_ALLLED_ON_L 0xFA  /**< Load tất cả thanh ghi LEDn_ON, byte thấp */
+#define PCA9685_ALLLED_ON_H 0xFB  /**< Load tất cả thanh ghi LEDn_ON, byte cao */
+#define PCA9685_ALLLED_OFF_L 0xFC /**< Load tất cả thanh ghi LEDn_OFF, byte thấp */
+#define PCA9685_ALLLED_OFF_H 0xFD /**< Load tất cả thanh ghi LEDn_OFF, byte cao */
+#define PCA9685_PRESCALE 0xFE     /**< Thanh ghi điều chỉnh tần số PWM */
+#define PCA9685_TESTMODE 0xFF     /**< Chế độ kiểm tra */
 
-#define MODE1_ALLCAL 0x01  /**< respond to LED All Call I2C-bus address */
-#define MODE1_SUB3 0x02    /**< respond to I2C-bus subaddress 3 */
-#define MODE1_SUB2 0x04    /**< respond to I2C-bus subaddress 2 */
-#define MODE1_SUB1 0x08    /**< respond to I2C-bus subaddress 1 */
-#define MODE1_SLEEP 0x10   /**< Low power mode. Oscillator off */
-#define MODE1_AI 0x20      /**< Auto-Increment enabled */
-#define MODE1_EXTCLK 0x40  /**< Use EXTCLK pin clock */
-#define MODE1_RESTART 0x80 /**< Restart enabled */
+// Các cờ chế độ 1
+#define MODE1_ALLCAL 0x01  /**< Phản hồi địa chỉ gọi tất cả LED */
+#define MODE1_SUB3 0x02    /**< Phản hồi địa chỉ phụ 3 */
+#define MODE1_SUB2 0x04    /**< Phản hồi địa chỉ phụ 2 */
+#define MODE1_SUB1 0x08    /**< Phản hồi địa chỉ phụ 1 */
+#define MODE1_SLEEP 0x10   /**< Chế độ tiết kiệm năng lượng, tắt dao động */
+#define MODE1_AI 0x20      /**< Tự động tăng địa chỉ */
+#define MODE1_EXTCLK 0x40  /**< Dùng đồng hồ từ chân EXTCLK */
+#define MODE1_RESTART 0x80 /**< Cho phép khởi động lại */
 
-#define MODE2_OUTNE_0 0x01 /**< Active LOW output enable input */
-#define MODE2_OUTNE_1 0x02                    /**< Active LOW output enable input - high impedience */
-#define MODE2_OUTDRV 0x04 /**< totem pole structure vs open-drain */
-#define MODE2_OCH 0x08    /**< Outputs change on ACK vs STOP */
-#define MODE2_INVRT 0x10  /**< Output logic state inverted */
+// Các cờ chế độ 2
+#define MODE2_OUTNE_0 0x01 /**< Bật đầu ra LOW */
+#define MODE2_OUTNE_1 0x02 /**< Bật đầu ra LOW, high impedence */
+#define MODE2_OUTDRV 0x04  /**< Cấu trúc totem pole vs open-drain */
+#define MODE2_OCH 0x08     /**< Thay đổi khi ACK vs STOP */
+#define MODE2_INVRT 0x10   /**< Đảo logic đầu ra */
 
-#define PCA9685_I2C_ADDRESS 0x40      //默认的PCA9685 I2C从地址
-#define FREQUENCY_OSCILLATOR 25000000 /**< Int. osc. frequency in datasheet */
+#define PCA9685_I2C_ADDRESS 0x40      // Địa chỉ mặc định của PCA9685
+#define FREQUENCY_OSCILLATOR 25000000 /**< Tần số dao động bên trong */
 
-#define PCA9685_PRESCALE_MIN 3    //最小预调值
-#define PCA9685_PRESCALE_MAX 255  //最大预调值
+#define PCA9685_PRESCALE_MIN 3    // Giá trị điều chỉnh tối thiểu
+#define PCA9685_PRESCALE_MAX 255  // Giá trị điều chỉnh tối đa
 
 class SF_Servo
 {
   public:
     SF_Servo(TwoWire &i2c);
-    void init();
-    void enable();
-    void disable();
-    void setAngle(uint8_t num, uint16_t val);
-    void setAngleRange(uint8_t min, uint8_t max);
-    void setPWMFreq(float freq);
-    void setPin(uint8_t num, uint16_t val, bool invert = false);
-    void setPWM(uint8_t num, uint16_t on, uint16_t off);
-    void reset();
-    void sleep();
-    void wakeup();
+    void init();                       // Khởi tạo servo
+    void enable();                     // Bật servo
+    void disable();                    // Tắt servo
+    void setAngle(uint8_t num, uint16_t val); // Đặt góc servo
+    void setAngleRange(uint8_t min, uint8_t max); // Đặt dải góc servo
+    void setPWMFreq(float freq);       // Đặt tần số PWM
+    void setPin(uint8_t num, uint16_t val, bool invert = false); // Đặt giá trị PWM cho chân
+    void setPWM(uint8_t num, uint16_t on, uint16_t off); // Cấu hình PWM trực tiếp
+    void reset();                      // Reset PCA9685
+    void sleep();                      // Chế độ ngủ
+    void wakeup();                     // Thức dậy
       
-  
   private:
-    uint8_t _min;
-    uint8_t _max;
-    float cal_min;
-    float cal_max;
+    uint8_t _min;  // Giá trị min
+    uint8_t _max;  // Giá trị max
+    float cal_min; // Giá trị min đã hiệu chỉnh
+    float cal_max; // Giá trị max đã hiệu chỉnh
 
-    TwoWire *_i2c;
+    TwoWire *_i2c; // Con trỏ tới I2C
 
-    void writeToPCA(uint8_t addr, uint8_t data);
-    uint8_t readFromPCA(uint8_t addr);
-
-
-    
+    void writeToPCA(uint8_t addr, uint8_t data); // Ghi dữ liệu tới PCA9685
+    uint8_t readFromPCA(uint8_t addr);           // Đọc dữ liệu từ PCA9685
 };
 
 #endif

@@ -5,54 +5,53 @@
 
 #define ROLL_OFFSET 0
 
-SF_Servo servos = SF_Servo(Wire); //实例化舵机
-bfs::SbusRx sbusRx(&Serial1);//实例化接收机
+SF_Servo servos = SF_Servo(Wire); // Khởi tạo servo
+bfs::SbusRx sbusRx(&Serial1); // Khởi tạo thu phát SBUS
 
+// Hàm giới hạn giá trị
 #define _constrain(amt, low, high) ((amt) < (low) ? (low) : ((amt) > (high) ? (high) : (amt))) // 限幅函数
 
-void getRCValue();
-void setServoAngle(uint16_t servoLeftFront, uint16_t servoLeftRear, uint16_t servoRightFront, uint16_t servoRightRear);
-void inverseKinematics();
+void getRCValue(); // Hàm đọc dữ liệu từ remote
+void setServoAngle(uint16_t servoLeftFront, uint16_t servoLeftRear, uint16_t servoRightFront, uint16_t servoRightRear); // Hàm set góc servo
+void inverseKinematics(); // Hàm tính toán ngược động học
 
 std::array<int16_t, bfs::SbusRx::NUM_CH()> sbusData;
 IKparam IKParam;
 float height;
-uint8_t lowest = 70;
-uint8_t highest = 130;
+uint8_t lowest = 70; // Chiều cao chân thấp nhất
+uint8_t highest = 130; // Chiều cao chân cao nhất
 float X,Y;
 float Y_demand;
-float Kp_Y=0.1;
+float Kp_Y=0.1; // Hệ số PID điều khiển chiều cao chân
 
 int16_t alphaLeftToAngle,betaLeftToAngle,alphaRightToAngle,betaRightToAngle;
-
-
 
 void setup() {
   Serial.begin(921600);
   Wire.begin(1,2,400000UL);
-  servos.init();
-  servos.setAngleRange(0,300);
-  servos.setPluseRange(500,2500);
-  sbusRx.Begin(SBUSPIN,-1);
+  servos.init(); // Khởi tạo servo
+  servos.setAngleRange(0,300); // Giới hạn góc servo
+  servos.setPluseRange(500,2500); // Giới hạn xung servo
+  sbusRx.Begin(SBUSPIN,-1); // Khởi tạo SBUS
 }
 
 void loop() {
-  getRCValue();
-  Y_demand = ((int)map(RCValue[2], RCCHANNEL3_MIN, RCCHANNEL3_MAX, lowest, highest));
+  getRCValue(); // Đọc dữ liệu remote
+  Y_demand = ((int)map(RCValue[2], RCCHANNEL3_MIN, RCCHANNEL3_MAX, lowest, highest)); // Map giá trị từ remote thành chiều cao chân mong muốn
 
-  X = 0;
-  Y = Y + Kp_Y * (Y_demand - Y);
+  X = 0; 
+  Y = Y + Kp_Y * (Y_demand - Y); // Điều chỉnh chiều cao chân theo PID đơn giản
 
   IKParam.XLeft = X;
   IKParam.XRight = X;
   IKParam.YLeft = Y;
   IKParam.YRight = Y;
-  // Serial.printf("%f,%f,%f\n",X,Y,Y_demand);
+  // Serial.printf("%f,%f,%f\n",X,Y,Y_demand); // Debug giá trị
 
-  inverseKinematics();
+  inverseKinematics(); // Tính toán góc servo từ IK
 }
 
-// 读取遥控器
+// Hàm đọc dữ liệu từ remote
 void getRCValue(){
   if(sbusRx.Read()){
     sbusData = sbusRx.ch();
@@ -63,6 +62,7 @@ void getRCValue(){
     RCValue[4] = sbusData[4];
     RCValue[5] = sbusData[5];
 
+    // Giới hạn giá trị đọc được
     RCValue[0] = _constrain(RCValue[0], RCCHANNEL_MIN, RCCHANNEL_MAX);
     RCValue[1] = _constrain(RCValue[1], RCCHANNEL_MIN, RCCHANNEL_MAX);
     RCValue[2] = _constrain(RCValue[2], RCCHANNEL3_MIN, RCCHANNEL3_MAX);
@@ -70,23 +70,20 @@ void getRCValue(){
   }
 }
 
+// Hàm set góc servo
 void setServoAngle(uint16_t servoLeftFront, uint16_t servoLeftRear, uint16_t servoRightFront, uint16_t servoRightRear){
-  // servos.setAngle(3, 90+servoLeftFront);//左前
-  // servos.setAngle(4, 90+servoLeftRear);//左后
-  // servos.setAngle(5, 270-servoRightFront);//右前
-  // servos.setAngle(6, 270-servoRightRear);//右后
-  servos.setAngle(3, servoLeftFront);//左前
-  servos.setAngle(4, servoLeftRear);//左后
-  servos.setAngle(5, servoRightFront);//右前
-  servos.setAngle(6, servoRightRear);//右后
+  servos.setAngle(3, servoLeftFront); // Chân trái trước
+  servos.setAngle(4, servoLeftRear); // Chân trái sau
+  servos.setAngle(5, servoRightFront); // Chân phải trước
+  servos.setAngle(6, servoRightRear); // Chân phải sau
 }
 
-
-
+// Hàm tính Inverse Kinematics cho robot 4 chân
 void inverseKinematics(){
   float alpha1,alpha2,beta1,beta2;
   uint16_t servoLeftFront,servoLeftRear,servoRightFront,servoRightRear;
 
+  // Tính toán chân trái
   float aLeft = 2 * IKParam.XLeft * L1;
   float bLeft = 2 * IKParam.YLeft * L1;
   float cLeft = IKParam.XLeft * IKParam.XLeft + IKParam.YLeft * IKParam.YLeft + L1 * L1 - L2 * L2;
@@ -106,7 +103,8 @@ void inverseKinematics(){
   else IKParam.alphaLeft = alpha2;
   if(beta1 >= 0 && beta1 <= PI/4) IKParam.betaLeft = beta1;
   else IKParam.betaLeft = beta2;
-  
+
+  // Tính toán chân phải
   float aRight = 2 * IKParam.XRight * L1;
   float bRight = 2 * IKParam.YRight * L1;
   float cRight = IKParam.XRight * IKParam.XRight + IKParam.YRight * IKParam.YRight + L1 * L1 - L2 * L2;
@@ -130,21 +128,17 @@ void inverseKinematics(){
   if(beta1 >= 0 && beta1 <= PI/4) IKParam.betaRight = beta1;
   else IKParam.betaRight = beta2;
 
-  alphaLeftToAngle = (int)((IKParam.alphaLeft / 6.28) * 360);//弧度转角度
+  // Chuyển radian sang góc độ
+  alphaLeftToAngle = (int)((IKParam.alphaLeft / 6.28) * 360);
   betaLeftToAngle = (int)((IKParam.betaLeft / 6.28) * 360);
-
   alphaRightToAngle = (int)((IKParam.alphaRight / 6.28) * 360);
   betaRightToAngle = (int)((IKParam.betaRight / 6.28) * 360);
 
+  // Tính góc servo cuối cùng
   servoLeftFront = 90 + betaLeftToAngle;
   servoLeftRear = 90 + alphaLeftToAngle;
   servoRightFront = 270 - betaRightToAngle;
   servoRightRear = 270 - alphaRightToAngle;
 
-  setServoAngle(servoLeftFront,servoLeftRear,servoRightFront,servoRightRear);
+  setServoAngle(servoLeftFront,servoLeftRear,servoRightFront,servoRightRear); // Gửi góc servo
 }
-
-
-
-
-
